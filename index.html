@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Memorizer</title>
+    <style>
+        body {
+            background-color: black;
+            background-image: radial-gradient(circle at bottom left, rgba(22, 7, 58, 0.671), rgba(40, 8, 92, 0.63), rgba(19, 1, 70, 0.733), rgba(11, 12, 80, 0.884));
+            color: white;
+        }
+        #modules {
+            display: flex;
+            height: 100vh;
+            position: relative;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 20px;
+            overflow: visible;
+        }
+        .dataset-module {
+            background-color: rgba(100, 149, 237, 0.2);
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin: 10px;
+            border-radius: 5px;
+            text-align: center;
+            width: 60%;
+        }
+        .dataset-module table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        .dataset-module th, .dataset-module td {
+            border: 1px solid white;
+            padding: 5px;
+            text-align: center;
+        }
+        .dataset-module button {
+            margin: 5px;
+            padding: 5px 10px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+        }
+        .modify { background-color: orange; color: white; }
+        .delete { background-color: red; color: white; }
+        .save { background-color: green; color: white; }
+        .add-row { background-color: blue; color: white; }
+        .add-column { background-color: purple; color: white; }
+        
+        #inputTitle {
+            padding: 12px;
+            background-color: #f4f7f6;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            color: #333;
+            width: fit-content;
+            transition: background-color 0.3s;
+        }
+        #inputTitle:focus {
+            background-color: #ffffff;
+            outline: none;
+        }
+
+
+        #add {
+            position: relative;
+            padding: 10px 40px;
+            font-size: 18px;
+            color: white;
+            background-color: #0300978f;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        #add:hover {
+            background-color: #6000a0;
+        }
+
+        .quiz-modal {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background-color: rgba(0, 0, 0, 0.9); color: white;
+        display: flex; flex-direction: column; justify-content: center;
+        align-items: center; z-index: 999;
+        text-align: center;
+    }
+    .quiz-btn {
+        padding: 10px; margin: 10px; background-color: rgba(60, 60, 168, 0.863);
+        color: white; border: none; cursor: pointer; font-size: 18px;
+        transition: background 0.3s;
+    }
+    .quiz-btn:hover {
+        background-color: darkblue;
+    }
+    </style>
+</head>
+<body>
+    <h1 id="heading">Welcome to the Memorizer</h1>
+    <div id="modules">
+    </div>
+    <script>
+const modulesDiv = document.getElementById("modules");
+
+// Load modules from localStorage or set default
+let modules = JSON.parse(localStorage.getItem("modules")) || {"Sample Module": []};
+
+function saveModules() {
+    localStorage.setItem("modules", JSON.stringify(modules));
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    displayModules();
+});
+
+function displayModules() {
+    modulesDiv.innerHTML = "";
+    for (let module in modules) {
+        const moduleDiv = document.createElement("div");
+        moduleDiv.classList.add("dataset-module");
+        moduleDiv.setAttribute("data-module", module);
+
+        const title = document.createElement("h3");
+        title.textContent = module;
+        title.onclick = function () { modifyTitle(module, title); };
+
+        const modifyBtn = document.createElement("button");
+        modifyBtn.textContent = "Modify";
+        modifyBtn.classList.add("modify");
+        modifyBtn.onclick = function () { modifyModule(module, moduleDiv); };
+
+        const deleteBtn = document.createElement("button");
+        deleteBtn.textContent = "Delete";
+        deleteBtn.classList.add("delete");
+        deleteBtn.onclick = function () { deleteModule(module); };
+
+        const memorizeBtn = document.createElement("button");
+        memorizeBtn.textContent = "Memorize";
+        memorizeBtn.classList.add("save");
+        memorizeBtn.onclick = function () { startQuiz(module); };
+
+        moduleDiv.appendChild(title);
+        moduleDiv.appendChild(modifyBtn);
+        moduleDiv.appendChild(deleteBtn);
+        moduleDiv.appendChild(memorizeBtn);
+        modulesDiv.appendChild(moduleDiv);
+    }
+    const addModuleBtn = document.createElement("button");
+        addModuleBtn.id = "add";
+        addModuleBtn.innerHTML = "NEW MODULE";
+        addModuleBtn.onclick = addModule;
+    modulesDiv.appendChild(addModuleBtn);
+}
+
+// Function to start the quiz for a given module
+function startQuiz(moduleName) {
+    const moduleData = modules[moduleName];
+    if (!moduleData || moduleData.length === 0) {
+        alert("No data available for this module!");
+        return;
+    }
+
+    // Initialize question index
+    let questionIndex = 0;
+
+    // Start displaying questions
+    function showNextQuestion() {
+        if (questionIndex >= 10) {
+            alert("Quiz complete!");
+            return;
+        }
+
+        // Select a random row
+        const rowIndex = Math.floor(Math.random() * moduleData.length);
+        const row = moduleData[rowIndex];
+
+        // Get column titles
+        const columnKeys = Object.keys(row);
+        if (columnKeys.length < 2) {
+            alert("Not enough data to create a quiz question!");
+            return;
+        }
+
+        // Pick two random columns
+        let [columnForItem, columnForQuestion] = columnKeys.sort(() => Math.random() - 0.5).slice(0, 2);
+        const itemValue = row[columnForItem];
+        const correctAnswer = row[columnForQuestion];
+
+        // Collect unique incorrect answers
+        let incorrectAnswers = new Set();
+        for (let i = 0; i < moduleData.length && incorrectAnswers.size < 4; i++) {
+            let randomAnswer = moduleData[i][columnForQuestion];
+            if (randomAnswer !== correctAnswer) {
+                incorrectAnswers.add(randomAnswer);
+            }
+        }
+
+        let choices = [correctAnswer, ...incorrectAnswers].sort(() => Math.random() - 0.5);
+        
+        // Show the new quiz screen with the randomly selected question
+        showQuizScreen(columnForQuestion, columnForItem, itemValue, correctAnswer, choices);
+    }
+
+    // Function to show the quiz question and handle answer
+    function showQuizScreen(questionColumn, itemColumn, itemValue, correctAnswer, choices) {
+        const existingQuiz = document.getElementById("quizModal");
+        if (existingQuiz) existingQuiz.remove();
+
+        const quizDiv = document.createElement("div");
+        quizDiv.id = "quizModal";
+        quizDiv.className = "quiz-modal";
+
+        quizDiv.innerHTML = `
+            <h2>What is the ${questionColumn} of ${itemColumn} "${itemValue}"?</h2>
+            <div class="quiz-options">
+                ${choices.map(choice => `<button class="quiz-btn">${choice}</button>`).join("")}
+            </div>
+        `;
+
+        document.body.appendChild(quizDiv);
+
+        // Add click listeners to each answer option
+        document.querySelectorAll(".quiz-btn").forEach(button => {
+            button.onclick = function () {
+                const isCorrect = button.textContent === correctAnswer;
+                alert(isCorrect ? "✅ Correct!" : `❌ Wrong! The correct answer was: ${correctAnswer}`);
+
+                // Close the current quiz and show the next question
+                quizDiv.remove();
+                questionIndex++;
+                showNextQuestion();  // Show next question immediately
+            };
+        });
+    }
+
+    // Start the quiz by showing the first question
+    showNextQuestion();
+}
+
+
+
+
+
+function addModule() {
+    const moduleName = prompt("Enter Module Name:").trim();
+    if (!moduleName) return;
+    if (modules[moduleName]) {
+        alert("Module already exists!");
+        return;
+    }
+    modules[moduleName] = [];
+    saveModules();
+    displayModules();
+}
+
+function modifyTitle(newTitle, moduleName, titleElement) {
+    if (newTitle && newTitle.trim() !== "" && !(newTitle in modules)) {
+        modules[newTitle] = modules[moduleName];
+        delete modules[moduleName];
+        saveModules(); // Save the updated modules
+        displayModules();
+    }
+}
+
+function deleteRow(moduleName, rowIndex) {
+    modules[moduleName].splice(rowIndex, 1);
+    saveModules(); // Save the updated modules
+    displayModules();
+}
+
+function deleteColumn(moduleName, columnName) {
+    modules[moduleName].forEach(row => delete row[columnName]);
+    saveModules(); // Save the updated modules
+    displayModules();
+}
+
+function modifyModule(moduleName, moduleDiv) {
+    moduleDiv.innerHTML = "";
+
+    const title = document.createElement('input');
+    title.placeholder = "Enter a valid title.";
+    title.value = moduleName;
+    title.id = "inputTitle";
+    
+
+    const table = document.createElement("table");
+    const headerRow = document.createElement("tr");
+
+    if (modules[moduleName].length === 0) {
+        modules[moduleName].push({});
+    }
+
+    let columnKeys = Object.keys(modules[moduleName][0]);
+
+    columnKeys.forEach(key => {
+        const th = document.createElement("th");
+        const span = document.createElement("span");
+        span.textContent = key;
+
+        const deleteColBtn = document.createElement("button");
+        deleteColBtn.innerHTML = "🗑️";
+        deleteColBtn.style.marginLeft = "5px";
+        deleteColBtn.onclick = function () { deleteColumn(moduleName, key); };
+
+        th.appendChild(span);
+        th.appendChild(deleteColBtn);
+        headerRow.appendChild(th);
+    });
+
+    table.appendChild(headerRow);
+
+    modules[moduleName].forEach((item, rowIndex) => {
+        const row = document.createElement("tr");
+
+        columnKeys.forEach(key => {
+            const td = document.createElement("td");
+            const input = document.createElement("input");
+            input.type = "text";
+            input.value = item[key] || "";
+            input.oninput = () => item[key] = input.value;
+            td.appendChild(input);
+            row.appendChild(td);
+        });
+
+        const deleteRowBtn = document.createElement("button");
+        deleteRowBtn.innerHTML = "🗑️";
+        deleteRowBtn.onclick = function () { deleteRow(moduleName, rowIndex); };
+        row.appendChild(deleteRowBtn);
+
+        table.appendChild(row);
+    });
+
+    const addRowBtn = document.createElement("button");
+    addRowBtn.textContent = "Add Row";
+    addRowBtn.classList.add("add-row");
+    addRowBtn.onclick = function () {
+        const newRow = {};
+        columnKeys.forEach(key => newRow[key] = "");
+        modules[moduleName].push(newRow);
+        saveModules(); // Save the updated modules
+        modifyModule(moduleName, moduleDiv);
+    };
+
+    const addColumnBtn = document.createElement("button");
+    addColumnBtn.textContent = "Add Column";
+    addColumnBtn.classList.add("add-column");
+    addColumnBtn.onclick = function () {
+        const columnName = prompt("Enter new column name:");
+        if (!columnName) return;
+        modules[moduleName].forEach(item => item[columnName] = "");
+        saveModules(); // Save the updated modules
+        modifyModule(moduleName, moduleDiv);
+    };
+
+    const saveBtn = document.createElement("button");
+    saveBtn.textContent = "Save Changes";
+    saveBtn.classList.add("save");
+    saveBtn.onclick = function () {
+        saveModules(); // Save the updated modules
+        modifyTitle(title.value, moduleName);
+        displayModules();
+    };
+
+    moduleDiv.appendChild(title);
+    moduleDiv.appendChild(table);
+    moduleDiv.appendChild(addRowBtn);
+    moduleDiv.appendChild(addColumnBtn);
+    moduleDiv.appendChild(saveBtn);
+}
+
+function deleteModule(moduleName) {
+    if (confirm(`Are you sure you want to delete "${moduleName}"? This cannot be undone.`)) {
+        delete modules[moduleName];
+        saveModules();
+        displayModules();
+    }
+}
+
+    </script>
+</body>
+</html>
